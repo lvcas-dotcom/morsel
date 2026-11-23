@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://morsel.dev/schemas/envelope/v1.json",
+  "title": "Morsel response envelope v1",
+  "description": "Every morsel_query / morsel_expand response. Keys are emitted in the order listed here; null/empty fields are omitted (constitution VI).",
+  "type": "object",
+  "required": ["cost"],
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "description": "Result shaped exactly like the selection. A field already delivered to this consumer at the same version is replaced by a crumb object.",
+      "type": ["object", "null"]
+    },
+    "cost": {
+      "type": "object",
+      "required": ["est", "act", "budget"],
+      "additionalProperties": false,
+      "properties": {
+        "est":    { "type": "integer", "minimum": 0, "description": "Estimated tokens before materialization." },
+        "act":    { "type": "integer", "minimum": 0, "description": "Tokens of this serialized envelope (by the configured tokenizer)." },
+        "budget": { "type": "integer", "minimum": 0 },
+        "saved":  { "type": "integer", "minimum": 0, "description": "Tokens avoided by crumbs and selection vs. naive baseline (estimate)." }
+      }
+    },
+    "crumbs": {
+      "description": "IDs of entities returned as crumbs in this response.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "truncated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path":   { "type": "string", "description": "JSON path of the cut field, e.g. data.symbol[0].body" },
+          "reason": { "enum": ["budget", "brief", "limit"] },
+          "next":   { "type": "string", "description": "Cursor or suggested bite to continue." }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "msg"],
+        "properties": {
+          "code":      { "enum": ["invalid_query", "over_budget", "not_found", "denied", "internal"] },
+          "msg":       { "type": "string" },
+          "at":        { "type": "string" },
+          "suggest":   { "type": "array", "items": { "type": "string" } },
+          "breakdown": { "type": "object", "additionalProperties": { "type": "integer" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "crumb": {
+      "description": "Replaces a field value already delivered to this consumer.",
+      "type": "object",
+      "required": ["$crumb", "v", "d"],
+      "additionalProperties": false,
+      "properties": {
+        "$crumb": { "type": "string", "description": "Entity id + field, e.g. sym:go:internal/orders.CreateOrder#body" },
+        "v":      { "type": "string", "description": "Version delivered earlier." },
+        "d":      { "type": "string", "maxLength": 120, "description": "One-line descriptor." }
+      }
+    }
+  }
+}

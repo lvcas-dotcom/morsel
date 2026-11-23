@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#120E0B"/><g transform="translate(59,23) scale(1.97)"><defs><linearGradient id="gbi" x1="0.15" y1="0" x2="0.85" y2="1">
+  <stop offset="0" stop-color="#FFB547"/><stop offset=".55" stop-color="#FF5A36"/><stop offset="1" stop-color="#E8361C"/></linearGradient><filter id="graini" filterUnits="userSpaceOnUse" x="-40" y="-40" width="300" height="300">
+  <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="n"/>
+  <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0" result="a"/>
+  <feComposite in="a" in2="SourceGraphic" operator="in" result="g"/>
+  <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="g"/></feMerge>
+</filter><mask id="mbi" maskUnits="userSpaceOnUse" x="-40" y="-40" width="300" height="300"><rect x="-40" y="-40" width="300" height="300" fill="white"/><circle cx="180" cy="47" r="39" fill="black"/></mask></defs><g filter="url(#graini)"><path d="M42 166 V100 A29 29 0 0 1 100 100 V166 M100 100 A29 29 0 0 1 158 100 V166" fill="none" stroke="url(#gbi)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" mask="url(#mbi)"/></g></g></svg>

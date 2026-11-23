@@ -1,0 +1,102 @@
+# Morsel — Graph schema (spec 001, v0.1)
+# Contrato: o servidor DEVE aceitar exatamente este schema (testes em T011).
+# Somente leitura. Sem Mutation, sem Subscription.
+
+"""Limita o custo da bite. Substitui o orçamento padrão até o teto configurado."""
+directive @budget(tokens: Int!) on QUERY
+
+"""Campos de texto longos retornam uma forma curta (primeiras linhas + cursor) em vez do conteúdo integral."""
+directive @brief(lines: Int = 12) on FIELD
+
+scalar Cursor
+
+type Query {
+  """Um arquivo pelo caminho relativo à raiz."""
+  file(path: String!): File
+
+  """Arquivos por glob (sintaxe doublestar). Ordem: caminho ascendente."""
+  files(glob: String!, first: Int = 20, after: Cursor): FileConnection!
+
+  """Símbolos pelo nome exato. `in` filtra por prefixo de pacote/diretório."""
+  symbol(name: String!, in: String, kind: SymbolKind): [Symbol!]!
+
+  """Busca de símbolos por prefixo/substring do nome. Ordem: relevância, depois ID."""
+  symbols(query: String!, kind: SymbolKind, first: Int = 20, after: Cursor): SymbolConnection!
+
+  """Resolve qualquer entidade (inclusive a partir de um crumb) pelo ID."""
+  ref(id: ID!): Entity
+}
+
+interface Entity {
+  id: ID!
+  version: String!
+  """Custo estimado, em tokens, do conteúdo integral da entidade."""
+  tokens: Int!
+}
+
+type File implements Entity {
+  id: ID!
+  version: String!
+  tokens: Int!
+  path: String!
+  language: String
+  bytes: Int!
+  lineCount: Int!
+  generated: Boolean!
+  binary: Boolean!
+  """Conteúdo integral. Sujeito a orçamento; use `lines` ou `outline` quando possível."""
+  content: String
+  """Intervalo inclusivo de linhas, 1-indexado."""
+  lines(from: Int!, to: Int!): String
+  """Símbolos declarados no arquivo, sem corpos. Ordem: linha."""
+  outline(kind: SymbolKind): [Symbol!]!
+  """Imports (Go)."""
+  imports: [String!]!
+}
+
+type Symbol implements Entity {
+  id: ID!
+  version: String!
+  tokens: Int!
+  name: String!
+  kind: SymbolKind!
+  package: String!
+  receiver: String
+  file: File!
+  line: Int!
+  endLine: Int!
+  exported: Boolean!
+  signature: String!
+  doc: String
+  body: String
+  callers(first: Int = 20): RelatedSymbols!
+  callees(first: Int = 20): RelatedSymbols!
+}
+
+type RelatedSymbols {
+  """true quando a resolução é por nome (pode conter falsos positivos)."""
+  approx: Boolean!
+  total: Int!
+  items: [Symbol!]!
+}
+
+enum SymbolKind {
+  FUNC
+  METHOD
+  TYPE
+  INTERFACE
+  CONST
+  VAR
+}
+
+type FileConnection {
+  total: Int!
+  items: [File!]!
+  next: Cursor
+}
+
+type SymbolConnection {
+  total: Int!
+  items: [Symbol!]!
+  next: Cursor
+}

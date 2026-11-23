@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 43 172 151" width="172" height="151"><g transform="translate(0,0) scale(1)"><defs><linearGradient id="gbm" x1="0.15" y1="0" x2="0.85" y2="1">
+  <stop offset="0" stop-color="#FFB547"/><stop offset=".55" stop-color="#FF5A36"/><stop offset="1" stop-color="#E8361C"/></linearGradient><filter id="grainm" filterUnits="userSpaceOnUse" x="-40" y="-40" width="300" height="300">
+  <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="n"/>
+  <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0" result="a"/>
+  <feComposite in="a" in2="SourceGraphic" operator="in" result="g"/>
+  <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="g"/></feMerge>
+</filter><mask id="mbm" maskUnits="userSpaceOnUse" x="-40" y="-40" width="300" height="300"><rect x="-40" y="-40" width="300" height="300" fill="white"/><circle cx="180" cy="47" r="39" fill="black"/></mask></defs><g filter="url(#grainm)"><path d="M42 166 V100 A29 29 0 0 1 100 100 V166 M100 100 A29 29 0 0 1 158 100 V166" fill="none" stroke="url(#gbm)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" mask="url(#mbm)"/></g></g></svg>
