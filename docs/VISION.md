@@ -3,6 +3,8 @@
 > *Feed your agents morsels, not feasts.*
 > Um motor de contexto para agentes de IA, inspirado no **lado cliente** do GraphQL.
 
+> Documento exploratório do desenho inicial. Afirmações de mercado e comparações abaixo não foram auditadas nesta revisão e não são evidência de originalidade, custo ou superioridade. Para comportamento normativo, consulte os contratos e a constituição v2.
+
 Este documento explica **por que** o Morsel existe, **qual tese** ele defende e **o que ele não é**. As decisões de *como* construir ficam em [`specs/`](../specs/).
 
 ---
@@ -72,7 +74,7 @@ Um **binário único em Go** que roda como **servidor MCP**. Ele fica entre o ag
 
 1. **Cada token precisa justificar sua presença.** Esse é o critério de toda feature.
 2. **Custo visível antes de servir.** Sem surpresas.
-3. **Determinismo.** A mesma consulta sobre o mesmo estado devolve os mesmos bytes, o que ajuda o *prompt cache* do provedor.
+3. **Determinismo.** A mesma consulta sobre o mesmo estado completo (incluindo entregas/expiração) devolve os mesmos bytes, o que ajuda o *prompt cache* do provedor.
 4. **Neutro.** Funciona com qualquer agente e qualquer modelo. Sem lock-in.
 5. **Medir antes de prometer.** Nenhum número de economia é publicado sem um benchmark reproduzível.
 
