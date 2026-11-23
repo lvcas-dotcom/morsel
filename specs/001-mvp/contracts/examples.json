@@ -1,0 +1,169 @@
+{
+  "status": "synthetic contract fixtures; not runtime or benchmark evidence",
+  "cases": [
+    {
+      "name": "selected-text",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ file(path:\"README.md\") { lines(from:1,to:1) } }"
+        }
+      },
+      "envelope": {
+        "data": {
+          "file": {
+            "lines": "# Morsel\n"
+          }
+        },
+        "cost": {
+          "est": 45,
+          "act": 26,
+          "budget": 4000,
+          "meter": "heuristic-v1"
+        }
+      }
+    },
+    {
+      "name": "selected-null",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ file(path:\"README.md\") { language } }"
+        }
+      },
+      "envelope": {
+        "data": {
+          "file": {
+            "language": null
+          }
+        },
+        "cost": {
+          "est": 40,
+          "act": 25,
+          "budget": 4000,
+          "meter": "heuristic-v1"
+        }
+      }
+    },
+    {
+      "name": "repeated-fragment",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ file(path:\"README.md\") { content } }",
+          "consumer": "main"
+        }
+      },
+      "envelope": {
+        "data": {
+          "file": {
+            "content": {
+              "$crumb": "frag:eyJlbnRpdHkiOiJmaWxlOlJFQURNRS5tZCIsImZpZWxkIjoiY29udGVudCIsImFyZ3MiOnt9fQ",
+              "v": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+              "d": "README.md content"
+            }
+          }
+        },
+        "cost": {
+          "est": 120,
+          "act": 96,
+          "budget": 4000,
+          "meter": "heuristic-v1"
+        },
+        "crumbs": [
+          "frag:eyJlbnRpdHkiOiJmaWxlOlJFQURNRS5tZCIsImZpZWxkIjoiY29udGVudCIsImFyZ3MiOnt9fQ"
+        ]
+      }
+    },
+    {
+      "name": "budget-cut",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ file(path:\"README.md\") { path content } }",
+          "budget": 256
+        }
+      },
+      "envelope": {
+        "data": {
+          "file": {
+            "path": "README.md"
+          }
+        },
+        "cost": {
+          "est": 2000,
+          "act": 72,
+          "budget": 256,
+          "meter": "heuristic-v1"
+        },
+        "truncated": [
+          {
+            "path": "/data/file/content",
+            "reason": "budget",
+            "next": {
+              "tool": "morsel_query",
+              "arguments": {
+                "query": "{ file(path:\"README.md\") { lines(from:1,to:10) } }",
+                "budget": 256
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-field",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ file(path:\"README.md\") { contnet } }"
+        }
+      },
+      "envelope": {
+        "cost": {
+          "est": 0,
+          "act": 47,
+          "budget": 4000,
+          "meter": "heuristic-v1"
+        },
+        "errors": [
+          {
+            "code": "invalid_query",
+            "msg": "Unknown field contnet.",
+            "location": {
+              "line": 1,
+              "column": 27
+            },
+            "suggest": [
+              "content"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "minimum-over-budget",
+      "input": {
+        "tool": "morsel_query",
+        "arguments": {
+          "query": "{ a0:__typename a1:__typename a2:__typename a3:__typename a4:__typename a5:__typename a6:__typename a7:__typename a8:__typename a9:__typename a10:__typename a11:__typename a12:__typename a13:__typename a14:__typename a15:__typename a16:__typename a17:__typename a18:__typename a19:__typename a20:__typename a21:__typename a22:__typename a23:__typename a24:__typename a25:__typename a26:__typename a27:__typename a28:__typename a29:__typename a30:__typename a31:__typename a32:__typename a33:__typename a34:__typename a35:__typename a36:__typename a37:__typename a38:__typename a39:__typename a40:__typename a41:__typename a42:__typename a43:__typename a44:__typename a45:__typename a46:__typename a47:__typename a48:__typename a49:__typename }",
+          "budget": 256
+        }
+      },
+      "envelope": {
+        "cost": {
+          "est": 2000,
+          "act": 38,
+          "budget": 256,
+          "meter": "heuristic-v1"
+        },
+        "errors": [
+          {
+            "code": "over_budget",
+            "msg": "Selection cannot fit; request fewer fields."
+          }
+        ]
+      }
+    }
+  ]
+}

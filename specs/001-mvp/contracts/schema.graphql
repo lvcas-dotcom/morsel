@@ -1,11 +1,11 @@
 # Morsel — Graph schema (spec 001, v0.1)
-# Contrato: o servidor DEVE aceitar exatamente este schema (testes em T011).
+# Contrato de seleção; perfil de resultado, limites e desvios em protocol.md.
 # Somente leitura. Sem Mutation, sem Subscription.
 
 """Limita o custo da bite. Substitui o orçamento padrão até o teto configurado."""
 directive @budget(tokens: Int!) on QUERY
 
-"""Campos de texto longos retornam uma forma curta (primeiras linhas + cursor) em vez do conteúdo integral."""
+"""Campos de texto longos retornam uma forma curta (primeiras linhas + marcador de recuperação) em vez do conteúdo integral."""
 directive @brief(lines: Int = 12) on FIELD
 
 scalar Cursor
@@ -17,20 +17,20 @@ type Query {
   """Arquivos por glob (sintaxe doublestar). Ordem: caminho ascendente."""
   files(glob: String!, first: Int = 20, after: Cursor): FileConnection!
 
-  """Símbolos pelo nome exato. `in` filtra por prefixo de pacote/diretório."""
+  """Símbolos pelo nome exato, ordenados por ID. `in` filtra por prefixo de pacote/diretório."""
   symbol(name: String!, in: String, kind: SymbolKind): [Symbol!]!
 
-  """Busca de símbolos por prefixo/substring do nome. Ordem: relevância, depois ID."""
+  """Busca de símbolos por prefixo/substring do nome. Substring case-sensitive. Ordem: ID ascendente."""
   symbols(query: String!, kind: SymbolKind, first: Int = 20, after: Cursor): SymbolConnection!
 
-  """Resolve qualquer entidade (inclusive a partir de um crumb) pelo ID."""
+  """Resolve uma entidade pelo ID. Tokens de fragmento usam morsel_expand."""
   ref(id: ID!): Entity
 }
 
 interface Entity {
   id: ID!
   version: String!
-  """Custo estimado, em tokens, do conteúdo integral da entidade."""
+  """Estimativa local do texto integral legível: arquivo ou declaração do símbolo; zero para binários."""
   tokens: Int!
 }
 
@@ -48,9 +48,9 @@ type File implements Entity {
   content: String
   """Intervalo inclusivo de linhas, 1-indexado."""
   lines(from: Int!, to: Int!): String
-  """Símbolos declarados no arquivo, sem corpos. Ordem: linha."""
+  """Símbolos declarados no arquivo, sem corpos implícitos. Ordem: linha, depois ID. Lista limitada."""
   outline(kind: SymbolKind): [Symbol!]!
-  """Imports (Go)."""
+  """Imports Go, ordenados lexicalmente."""
   imports: [String!]!
 }
 
@@ -68,9 +68,10 @@ type Symbol implements Entity {
   exported: Boolean!
   signature: String!
   doc: String
+  """Bytes da declaração completa, excluindo o comentário de documentação; não apenas o bloco de uma função."""
   body: String
-  callers(first: Int = 20): RelatedSymbols!
-  callees(first: Int = 20): RelatedSymbols!
+  callers(first: Int = 20, after: Cursor): RelatedSymbols!
+  callees(first: Int = 20, after: Cursor): RelatedSymbols!
 }
 
 type RelatedSymbols {
@@ -78,6 +79,7 @@ type RelatedSymbols {
   approx: Boolean!
   total: Int!
   items: [Symbol!]!
+  next: Cursor
 }
 
 enum SymbolKind {

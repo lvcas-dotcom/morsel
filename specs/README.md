@@ -1,72 +1,52 @@
-# Specs: como o Morsel é construído (SDD)
+# Specs do Morsel
 
-O Morsel segue **Spec-Driven Development (SDD)**: a especificação é a fonte da verdade, e o código é consequência dela. Isso vale para humanos e também para agentes de código. Um agente que implementa uma tarefa recebe a spec, não uma conversa solta.
+O projeto segue desenvolvimento por especificação. O estado atual é design: nenhuma tarefa de runtime foi implementada. Comece pela [análise](../docs/REPOSITORY-REVIEW.md), pela [constituição v2](constitution.md) e pelo [catálogo do MVP](001-mvp/README.md).
 
-## Estrutura
+## Fontes de verdade
 
-```
-specs/
-├── README.md                  ← este arquivo (o processo)
-├── constitution.md            ← princípios inegociáveis (vale para todas as features)
-└── 001-mvp/                   ← uma pasta por feature, numerada
-    ├── spec.md                ← O QUÊ e POR QUÊ (sem tecnologia)
-    ├── research.md            ← decisões técnicas e alternativas descartadas
-    ├── plan.md                ← COMO (arquitetura, pacotes, algoritmos)
-    ├── contracts/             ← contratos verificáveis (schema, ferramentas, envelope)
-    │   ├── schema.graphql
-    │   ├── mcp-tools.md
-    │   └── envelope.schema.json
-    └── tasks.md               ← tarefas ordenadas, rastreáveis até os requisitos
-```
+| Documento | Autoridade |
+|---|---|
+| [constitution.md](constitution.md) | Princípios globais |
+| [001-mvp/spec.md](001-mvp/spec.md) | Produto, histórias, FR e critérios de sucesso |
+| [001-mvp/contracts/protocol.md](001-mvp/contracts/protocol.md) | Semântica de wire |
+| [001-mvp/contracts/](001-mvp/contracts/) | SDL, JSON Schema, tools e exemplos canônicos |
+| [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) | Fronteiras e dependências |
+| [001-mvp/README.md](001-mvp/README.md) | Specs menores, dependências e cobertura de FR |
+| `001-mvp/0*/{spec,plan,tasks}.md` | Aceitação, desenho local e tarefas de cada entrega |
 
-## O fluxo
+Não resolver conflito escolhendo um documento silenciosamente. Corrigir requisitos, contrato e testes afetados juntos, antes de implementar. `specs/spec.md` e `specs/tasks.md` são somente links legados.
 
-```mermaid
-flowchart LR
-    C[constitution] --> S[spec.md<br/>o quê / por quê]
-    S --> R[research.md<br/>decisões]
-    R --> P[plan.md<br/>como]
-    P --> K[contracts/<br/>contratos]
-    K --> T[tasks.md<br/>tarefas]
-    T --> I[implementação<br/>test-first]
-    I -- "descobriu algo?" --> S
-```
+## Fluxo de contribuição
 
-1. **Constituição.** Ela é lida antes de tudo. Qualquer plano que viole um princípio precisa justificar a exceção na seção *Constitution Check* do `plan.md`.
-2. **Spec.** Histórias de usuário com prioridade, cenários de aceitação (Dado/Quando/Então), requisitos funcionais numerados (`FR-xxx`) e critérios de sucesso mensuráveis (`SC-xxx`). **Não menciona tecnologia.** Dúvidas ficam marcadas como `[NEEDS CLARIFICATION]`.
-3. **Research.** Cada decisão técnica relevante registra: decisão, motivo e alternativas descartadas.
-4. **Plan.** Arquitetura, layout de pacotes, modelo de dados, algoritmos e estratégia de testes.
-5. **Contracts.** Artefatos que o código **precisa** satisfazer e que viram testes: o schema GraphQL, o contrato das ferramentas MCP e o JSON Schema do envelope.
-6. **Tasks.** Lista ordenada com IDs (`T001`), marcação de paralelismo (`[P]`), história de usuário (`[US1]`) e requisitos cobertos. **Os testes vêm antes da implementação.**
-7. **Implementação.** Cada PR referencia as tarefas e os `FR` que implementa.
+1. Ler a constituição, a spec da entrega e os contratos envolvidos.
+2. Alterar requisitos antes de comportamento novo; registrar decisão relevante em research.
+3. Selecionar uma tarefa pequena com dependências concluídas. Implementação começa por teste de comportamento que falha.
+4. Implementar apenas a fatia selecionada, rodar checks pertinentes e revisar diff/casos de borda.
+5. Marcar tarefa somente com evidência de aceite. PR referencia IDs de tarefa e FR; documentação pronta não significa runtime pronto.
 
-## Regras do jogo
+Specs estão em português; README e guias de contribuição são em inglês. Tradução das instruções de instalação é gate de release. IDs são estáveis e não se repetem entre entregas.
 
-- **Mudou o comportamento? Mude a spec primeiro.** PRs com comportamento novo sem mudança de spec são recusados.
-- **Toda tarefa é rastreável:** tarefa → FR → história de usuário → visão.
-- **Nada de `[NEEDS CLARIFICATION]` aberto** em requisito de uma história que está sendo implementada.
-- **Os contratos são testes.** Se o contrato muda, os testes de contrato mudam no mesmo PR.
+## Execução com agentes
 
-## Trabalhando com agentes de código
-
-Para implementar uma tarefa com Claude Code, Codex ou similares, use este prompt:
-
-```
-Leia specs/constitution.md e specs/001-mvp/{spec,plan}.md e os contratos.
-Implemente a tarefa T0XX de specs/001-mvp/tasks.md.
-Comece pelo teste. Não implemente nada fora do escopo da tarefa.
-Ao terminar, marque a tarefa como [x] e liste os FR cobertos.
+```text
+Leia specs/constitution.md, specs/001-mvp/README.md e docs/ARCHITECTURE.md.
+Leia spec.md, plan.md e tasks.md da entrega selecionada e os contratos afetados.
+Implemente somente M0X-T0Y e suas dependências já autorizadas.
+Comece pelo teste, verifique os critérios de aceite e reporte limitações.
+Não marque entrega ou benchmark como concluído sem evidência executada.
 ```
 
-Esse formato mantém o agente no trilho e torna o próprio desenvolvimento do Morsel um caso de uso de **contexto enxuto**.
+## Depois do MVP
 
-## Próximas features (ainda sem spec)
+IDs existentes permanecem reservados. São ideias, sem especificação implementável ou compromisso de API. Só avançar após o gate H1 da M07.
 
-| Pasta | Feature | Versão |
+| ID reservado | Escopo futuro | Versão pretendida |
 |---|---|---|
-| `002-upstream-mcp` | Proxy de servidores MCP upstream com projeção | v0.2 |
-| `003-persistent-pantry` | Cache persistente entre sessões | v0.2 |
-| `004-postgres` | Fonte Postgres (schema, amostras, consultas somente leitura) | v0.3 |
-| `005-multilang-symbols` | Símbolos multilinguagem (tree-sitter) | v0.3 |
-| `006-recipes` | Bites persistidas e nomeadas | v0.3 |
-| `007-daemon` | Daemon HTTP compartilhado entre agentes e sessões | v0.4 |
+| 002-upstream-mcp | Proxy com projeção e fronteira de confiança | v0.2 |
+| 003-persistent-pantry | Cache persistente, permissões e migração | v0.2 |
+| 004-postgres | Fonte SQL somente leitura e autorização | v0.3 |
+| 005-multilang-symbols | Outras linguagens, sem assumir cgo no núcleo | v0.3 |
+| 006-recipes | Consultas persistidas e versionadas | v0.3 |
+| 007-daemon | HTTP, autenticação, quotas e isolamento | v0.4 |
+
+Validação documental disponível agora: `python3 tools/check_specs.py`. Os comandos Go serão adicionados na M01, junto da implementação.

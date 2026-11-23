@@ -1,5 +1,7 @@
 # Research 001: decisões técnicas
 
+> Registro histórico: R1–R10 refletem o desenho inicial. R11–R15 abaixo substituem explicitamente escolhas conflitantes; contratos atuais prevalecem. Nada aqui comprova benchmark ou compatibilidade de runtime.
+
 Cada decisão registra **o que** foi escolhido, **por quê** e **o que foi descartado**. Mudanças futuras devem adicionar uma nova entrada que referencia a anterior, sem apagar o histórico.
 
 ---
@@ -73,3 +75,41 @@ Cada decisão registra **o que** foi escolhido, **por quê** e **o que foi desca
 
 - **Decisão:** `morsel.toml`, com expansão de variáveis de ambiente (`${VAR}`), via `github.com/BurntSushi/toml`.
 - **Por quê:** TOML é legível, comum no ecossistema e não tem as ambiguidades do YAML.
+
+
+## R11. Revisão de consistência e custo (substitui R5 e parte de R7)
+
+- Decisão: `cost.est/act/budget/meter`; o medidor padrão é heurístico e offline. `act` mede o texto final segundo esse medidor, sem alegar contagem ou custo do provedor.
+- Motivo: heurística não pode garantir teto de tokens para modelos desconhecidos. Wrapper MCP, discovery e histórico têm custos separados.
+- Calibração remota foi retirada da v0.1. Corpus versionado com contagem de referência conhecida é gate para anunciar SC-002. Nenhum coeficiente é chamado de calibrado antes disso.
+- `cost.saved` sai do envelope v1 e permanece nas estatísticas, evitando uma segunda autorreferência numérica. Finalização e limites estão em `contracts/protocol.md` e M04. A ordem de JSON Schema não determina ordem de JSON; o protocolo a define.
+
+## R12. Identidade, frescor e consumidores (substitui R8)
+
+- SHA-256 completo da stdlib para versões; elimina dependência xxhash e prefixo de 32 bits. Identidade de símbolo inclui arquivo, kind e receptor/nome normalizados.
+- Chave de fragmento inclui argumentos efetivos. Crumbs exigem consumidor explícito e conexão; sem consumidor não há supressão. Evita depender de comportamento específico de subagentes.
+- Snapshot por conteúdo; `mtime+size` não prova igualdade. Índice com erro sintático não conserva símbolos antigos como atuais.
+- Tradeoff: hashing e descoberta completos podem custar latência. Medir esse custo na M07 antes de otimizar a garantia.
+
+## R13. Fronteiras e dependências (revisa R2, R3, R6 e R10)
+
+- Manter parser GraphQL e SDK MCP como escolhas, fixando versões na M01. Testar API concreta antes de congelar mínimo Go e conjunto de protocolos.
+- Um pacote de contratos no diretório canônico permite embed sem cópias. Planner/executor ficam em query; fontes locais ficam em workspace até haver motivo real de extração.
+- TOML, doublestar, gitignore e singleflight podem justificar dependências pontuais; avaliar licenças, manutenção e semântica. Não implementar gitignore parcial silenciosamente. Não escolher biblioteca por lista aspiracional.
+- Sem framework DI, registry de plugins ou camadas genéricas. CLI simples primeiro. Persistência de contadores é distinta de cache de conteúdo.
+
+## R14. Benchmark e escopo de rede (substitui a aceitação fraca de R9)
+
+- Runner externo opt-in, fixtures sem segredos e verifier independente. Fixar agente, modelo, tokens de referência, prompt e versão Morsel.
+- Teste que apenas detecta uma palavra não comprova entendimento. Tarefas de explicação exigem rubrica previamente fixada e revisão cega; correção exige teste de regressão não exposto ao agente.
+- Metadados locais de stats não são economia faturada. Estimativa de baseline e experimento com uso de provedor são métricas separadas.
+- N pequeno é piloto. Incerteza inconclusiva bloqueia alegação H1 e avanço de escopo; não se excluem fracassos do cálculo.
+
+## R15. Fontes primárias verificadas em 2026-11-23
+
+- [Go module layout](https://go.dev/doc/modules/layout): `cmd` e `internal` para comandos e implementação privada.
+- [os.Root](https://go.dev/blog/osroot), [API e limites](https://pkg.go.dev/os#Root): confinamento resistente a traversal; não cobre todos os riscos de filesystem.
+- [SDK MCP Go](https://github.com/modelcontextprotocol/go-sdk), [stdio 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports): stdout é exclusivamente protocolo; pin e testes reais serão feitos na implementação.
+- [GraphQL September 2025](https://spec.graphql.org/September2025/): seleção não vazia, variáveis, validação, fragments e interfaces. O Morsel usa essa linguagem com perfil próprio de projeção; não promete executor GraphQL completo.
+
+Essas fontes fundamentam decisões, não substituem validação das bibliotecas fixadas ou do produto.

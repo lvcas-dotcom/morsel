@@ -1,71 +1,335 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://morsel.dev/schemas/envelope/v1.json",
-  "title": "Morsel response envelope v1",
-  "description": "Every morsel_query / morsel_expand response. Keys are emitted in the order listed here; null/empty fields are omitted (constitution VI).",
+  "title": "Morsel textual projection envelope v1",
+  "description": "Wire design. Serialization order and semantic invariants are defined in protocol.md; JSON Schema alone does not check act <= budget or GraphQL result types.",
   "type": "object",
-  "required": ["cost"],
+  "required": [
+    "cost"
+  ],
   "additionalProperties": false,
   "properties": {
     "data": {
-      "description": "Result shaped exactly like the selection. A field already delivered to this consumer at the same version is replaced by a crumb object.",
-      "type": ["object", "null"]
+      "anyOf": [
+        {
+          "$ref": "#/$defs/object"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "cost": {
       "type": "object",
-      "required": ["est", "act", "budget"],
+      "required": [
+        "est",
+        "act",
+        "budget",
+        "meter"
+      ],
       "additionalProperties": false,
       "properties": {
-        "est":    { "type": "integer", "minimum": 0, "description": "Estimated tokens before materialization." },
-        "act":    { "type": "integer", "minimum": 0, "description": "Tokens of this serialized envelope (by the configured tokenizer)." },
-        "budget": { "type": "integer", "minimum": 0 },
-        "saved":  { "type": "integer", "minimum": 0, "description": "Tokens avoided by crumbs and selection vs. naive baseline (estimate)." }
+        "est": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "act": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000
+        },
+        "meter": {
+          "const": "heuristic-v1"
+        }
       }
     },
     "crumbs": {
-      "description": "IDs of entities returned as crumbs in this response.",
       "type": "array",
-      "items": { "type": "string" }
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^frag:",
+        "maxLength": 2048
+      }
     },
     "truncated": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["path", "reason"],
+        "required": [
+          "path",
+          "reason",
+          "next"
+        ],
         "additionalProperties": false,
         "properties": {
-          "path":   { "type": "string", "description": "JSON path of the cut field, e.g. data.symbol[0].body" },
-          "reason": { "enum": ["budget", "brief", "limit"] },
-          "next":   { "type": "string", "description": "Cursor or suggested bite to continue." }
+          "path": {
+            "type": "string",
+            "pattern": "^/data(?:/|$)"
+          },
+          "reason": {
+            "enum": [
+              "budget",
+              "brief",
+              "limit"
+            ]
+          },
+          "next": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tool",
+                  "arguments"
+                ],
+                "properties": {
+                  "tool": {
+                    "const": "morsel_query"
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 65536
+                      },
+                      "variables": {
+                        "type": "object",
+                        "default": {}
+                      },
+                      "operationName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "budget": {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 16000,
+                        "description": "Local meter budget; overrides query directive."
+                      },
+                      "fresh": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "consumer": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Explicit context owner; omit to disable crumbs."
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tool",
+                  "arguments"
+                ],
+                "properties": {
+                  "tool": {
+                    "const": "morsel_expand"
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "select": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 65536
+                      },
+                      "budget": {
+                        "type": "integer",
+                        "minimum": 256,
+                        "maximum": 16000,
+                        "description": "Local meter budget; overrides query directive."
+                      },
+                      "consumer": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Explicit context owner; omit to disable crumbs."
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "id": {
+                              "pattern": "^frag:"
+                            }
+                          }
+                        },
+                        "then": {},
+                        "else": {
+                          "required": [
+                            "select"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     },
     "errors": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["code", "msg"],
+        "required": [
+          "code",
+          "msg"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "code":      { "enum": ["invalid_query", "over_budget", "not_found", "denied", "internal"] },
-          "msg":       { "type": "string" },
-          "at":        { "type": "string" },
-          "suggest":   { "type": "array", "items": { "type": "string" } },
-          "breakdown": { "type": "object", "additionalProperties": { "type": "integer" } }
+          "code": {
+            "enum": [
+              "invalid_query",
+              "over_budget",
+              "not_found",
+              "denied",
+              "limit",
+              "source_changed",
+              "index_unavailable",
+              "invalid_cursor",
+              "internal"
+            ]
+          },
+          "msg": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "at": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "location": {
+            "type": "object",
+            "required": [
+              "line",
+              "column"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "suggest": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          "breakdown": {
+            "type": "object",
+            "maxProperties": 8,
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     }
   },
   "$defs": {
     "crumb": {
-      "description": "Replaces a field value already delivered to this consumer.",
       "type": "object",
-      "required": ["$crumb", "v", "d"],
+      "required": [
+        "$crumb",
+        "v",
+        "d"
+      ],
       "additionalProperties": false,
       "properties": {
-        "$crumb": { "type": "string", "description": "Entity id + field, e.g. sym:go:internal/orders.CreateOrder#body" },
-        "v":      { "type": "string", "description": "Version delivered earlier." },
-        "d":      { "type": "string", "maxLength": 120, "description": "One-line descriptor." }
+        "$crumb": {
+          "type": "string",
+          "pattern": "^frag:",
+          "maxLength": 2048
+        },
+        "v": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "d": {
+          "type": "string",
+          "maxLength": 120,
+          "pattern": "^[^\\r\\n]*$"
+        }
       }
+    },
+    "object": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "const": "$crumb"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "$ref": "#/$defs/object"
+        },
+        {
+          "$ref": "#/$defs/crumb"
+        }
+      ]
     }
   }
 }

@@ -1,12 +1,12 @@
 # Feature Spec 001: MVP "first bite" (v0.1)
 
-**Status:** Draft · **Criada em:** 2026-11-23 · **Constituição:** v1.0.0
+**Status:** Especificado; implementação pendente · **Criada em:** 2026-11-23 · **Constituição:** v2.0.0
 
-> Esta spec descreve **o quê** e **por quê**. Nenhuma decisão de tecnologia aparece aqui; elas ficam em `research.md` e `plan.md`.
+> Esta spec descreve **o quê** e **por quê**, incluindo os limites do contrato público. As decisões técnicas e algoritmos ficam em `research.md` e `plan.md`.
 
 ## Resumo
 
-Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de um repositório local pedindo **apenas os campos de que precisa**, com **custo em tokens visível e orçamento respeitado**, e **sem receber de novo o que já recebeu**. Inclui também a medição para validar a hipótese H1 ([VISION.md §7](../../docs/VISION.md)).
+Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de um repositório local pedindo **apenas os campos de que precisa**, com **custo em tokens visível e orçamento respeitado**, e **sem receber de novo conteúdo confirmado para o mesmo consumidor explícito**. Inclui também a medição para validar a hipótese H1 ([VISION.md §7](../../docs/VISION.md)).
 
 ## Escopo
 
@@ -28,7 +28,7 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 
 1. **Dado** um repositório com `internal/orders/service.go` contendo `func CreateOrder(...)`, **quando** o agente consulta `symbol(name:"CreateOrder"){ signature }`, **então** a resposta contém apenas a assinatura e o custo reportado é menor que o custo do arquivo completo.
 2. **Dado** um arquivo de 2.000 linhas, **quando** o agente consulta `file(path:...){ lines(from:100, to:140) }`, **então** recebe exatamente essas 41 linhas.
-3. **Dado** um nome de símbolo que existe em dois pacotes, **quando** o agente consulta sem filtro de pacote, **então** recebe a lista dos dois com pacote e arquivo, sem os corpos.
+3. **Dado** um nome de símbolo que existe em dois pacotes, **quando** o agente consulta sem filtro de pacote, **então** recebe ambos, apenas com os campos selecionados; pacote e arquivo só aparecem se pedidos.
 4. **Dado** um padrão `files(glob:"internal/**/*_test.go", first:10){ items { path tokens } next }`, **quando** é executado, **então** recebe até 10 caminhos com o custo em tokens de cada um, em ordem estável.
 
 ### US2: Orçamento de tokens (plate) (P1) 🎯 MVP
@@ -39,20 +39,20 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 
 **Cenários de aceitação**
 
-1. **Dado** qualquer consulta, **quando** ela é respondida, **então** o envelope contém `cost.estimated`, `cost.actual` e `cost.budget`.
+1. **Dado** qualquer consulta, **quando** ela é respondida, **então** o envelope contém `cost.est`, `cost.act`, `cost.budget` e `cost.meter`; o custo é local, conforme o medidor declarado.
 2. **Dado** uma consulta cuja estimativa excede o orçamento, **quando** é executada, **então** a resposta respeita o orçamento, lista os campos cortados em `truncated` (com um cursor ou instrução para continuar) e nunca excede `cost.budget`.
-3. **Dado** uma consulta que não cabe no orçamento nem com cortes (por exemplo, só o envelope mínimo já excede), **quando** é executada, **então** o agente recebe um erro `over_budget` com o custo estimado **por campo**, para poder reformular.
+3. **Dado** uma consulta que não cabe no orçamento nem com cortes (por exemplo, a seleção mínima indivisível excede), **quando** é executada, **então** o agente recebe um erro `over_budget` e, quando couber, breakdown limitado por campo; o erro mínimo também respeita o orçamento.
 4. **Dado** `@budget(tokens: N)` na consulta, **quando** é executada, **então** N substitui o orçamento padrão, respeitando o teto máximo configurado.
 
 ### US3: Não repetir o que já foi servido (crumbs) (P2)
 
-**Como** agente em uma sessão longa, **quero** que conteúdo idêntico que já recebi venha como referência curta **para** não pagar de novo por ele.
+**Como** agente em uma sessão longa, **quero** que conteúdo idêntico que já recebi venha como referência curta **para** reduzir repetição no contexto; economia faturada depende do provedor e é medida separadamente.
 
-**Teste independente:** a mesma consulta executada duas vezes na mesma sessão tem a segunda resposta substancialmente menor, com crumbs no lugar do conteúdo.
+**Teste independente:** a mesma consulta com consumidor explícito executada duas vezes na mesma conexão tem a segunda resposta substancialmente menor, com crumbs no lugar do conteúdo.
 
 **Cenários de aceitação**
 
-1. **Dado** que o agente já recebeu o `body` de `CreateOrder` (versão v1) nesta sessão, **quando** consulta o mesmo `body` de novo e o arquivo não mudou, **então** recebe um crumb (ID, versão e descritor de uma linha) em vez do corpo.
+1. **Dado** que o agente já recebeu o `body` de `CreateOrder` (versão v1) nesta conexão com consumer explícito, **quando** o mesmo consumer consulta o mesmo `body` de novo e o arquivo não mudou, **então** recebe um crumb (ID, versão e descritor de uma linha) em vez do corpo.
 2. **Dado** que o arquivo mudou desde a última entrega, **quando** o agente consulta de novo, **então** recebe o conteúdo novo (a versão mudou, então não há crumb).
 3. **Dado** um crumb, **quando** o agente chama `morsel_expand` com o ID dele, **então** recebe o conteúdo integral, com seleção de campos opcional.
 4. **Dado** `fresh: true` numa consulta, **quando** ela é executada, **então** nenhum crumb é usado.
@@ -75,7 +75,7 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 **Cenários de aceitação**
 
 1. **Dado** uma sessão ativa ou encerrada, **quando** executo `morsel stats`, **então** vejo os tokens servidos, os tokens que leituras ingênuas teriam custado, a economia estimada e o detalhamento por tipo de entidade, com o rótulo explícito de "estimativa".
-2. **Dado** o diretório `bench/` com tarefas definidas, **quando** executo `morsel bench`, **então** cada tarefa roda N vezes com e sem Morsel, e o relatório mostra os tokens de entrada, o custo, a taxa de sucesso e o intervalo de variação.
+2. **Dado** o diretório `bench/` com tarefas definidas, **quando** executo `bench/run` (runner externo opt-in), **então** cada tarefa roda N vezes com e sem Morsel, e o relatório mostra os tokens de entrada, o custo, a taxa de sucesso e o intervalo de variação.
 
 ### US6: Começar em 5 minutos (P3)
 
@@ -83,8 +83,8 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 
 **Cenários de aceitação**
 
-1. **Dado** um repositório sem configuração, **quando** executo `morsel init`, **então** é criado um `morsel.toml` com padrões seguros e é gerado um snippet de instruções para o agente (`AGENTS.md` ou `CLAUDE.md`), sem sobrescrever conteúdo existente.
-2. **Dado** o snippet aplicado, **quando** o agente recebe uma tarefa no repositório, **então** ele tem as instruções para preferir `morsel_query` à leitura de arquivos inteiros.
+1. **Dado** um repositório sem configuração, **quando** executo `morsel init`, **então** é criado um `morsel.toml` com padrões seguros e é impresso um snippet de instruções; gravação em `AGENTS.md`/`CLAUDE.md` exige destino explícito, preserva conteúdo e é idempotente.
+2. **Dado** o snippet aplicado explicitamente pelo usuário, **quando** o agente recebe uma tarefa no repositório, **então** ele tem as instruções para preferir `morsel_query` à leitura de arquivos inteiros.
 
 ---
 
@@ -94,8 +94,8 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 - **FR-001** O sistema DEVE aceitar consultas com seleção de campos sobre um grafo tipado, contendo apenas leitura.
 - **FR-002** O sistema DEVE expor as raízes `file`, `files`, `symbol`, `symbols` e `ref` (ver `contracts/schema.graphql`).
 - **FR-003** O sistema DEVE validar cada consulta contra o schema antes de executar e, em caso de erro, retornar a localização e sugestões.
-- **FR-004** O sistema DEVE retornar somente os campos selecionados, sem campos extras.
-- **FR-005** Listas DEVEM ter um limite padrão (`first`), com o limite máximo configurável, e ordenação estável documentada.
+- **FR-004** O sistema DEVE retornar somente campos selecionados, sem extras em data. Cortes/crumbs seguem o perfil explícito do protocolo; null selecionado não é omitido.
+- **FR-005** Listas pagináveis DEVEM ter limite padrão (`first`) e teto configurável. Listas sem paginação DEVEM ter teto de trabalho explícito e erro ao excedê-lo, sem truncamento silencioso. Toda lista possui ordenação estável documentada.
 - **FR-006** O sistema DEVE suportar intervalos de linhas em arquivos e o campo `outline` (lista de símbolos de um arquivo, sem corpos).
 
 ### Símbolos Go
@@ -105,24 +105,24 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 - **FR-010** O índice DEVE refletir mudanças em arquivos na próxima consulta, sem reiniciar o servidor.
 
 ### Custo e orçamento
-- **FR-011** Toda resposta DEVE conter `cost.estimated`, `cost.actual` e `cost.budget`.
-- **FR-012** A estimativa DEVE ser calculada **antes** da materialização do conteúdo, quando a fonte permitir (arquivos e símbolos permitem).
-- **FR-013** O sistema NUNCA DEVE retornar um payload com `cost.actual > cost.budget`.
+- **FR-011** Toda resposta de consulta/expansão DEVE conter `cost.est`, `cost.act`, `cost.budget` e `cost.meter`. O teto vale para o JSON textual final no medidor local declarado; não garante tokens ou preço do provedor.
+- **FR-012** A estimativa DEVE preceder a projeção da resposta e usar metadados disponíveis. A captura/versionamento e a indexação fria podem exigir leitura prévia, contabilizada como trabalho da consulta.
+- **FR-013** O sistema NUNCA DEVE retornar um payload com `cost.act > cost.budget`.
 - **FR-014** Quando houver cortes, a resposta DEVE listar em `truncated` cada campo cortado, o motivo e como continuar (cursor ou bite sugerida).
 - **FR-015** O orçamento DEVE ser configurável por padrão, por consulta (`@budget`) e com teto máximo.
 - **FR-016** A contagem de tokens DEVE usar um estimador plugável, com um padrão que não depende de rede.
 
 ### Crumbs e expansão
-- **FR-017** O sistema DEVE manter, por consumidor, o registro de quais entidades (ID + versão + campo) já foram entregues.
-- **FR-018** Uma entrega repetida de entidade, campo e versão idênticos DEVE virar um crumb, exceto quando `fresh: true`.
-- **FR-019** Um crumb DEVE conter o ID da entidade, a versão e um descritor de no máximo 1 linha.
-- **FR-020** `morsel_expand(id, select?)` DEVE devolver o conteúdo integral (ou a projeção pedida) e registrar a entrega.
-- **FR-021** O consumidor padrão DEVE ser a sessão MCP, e o agente PODE informar um identificador de consumidor explícito.
+- **FR-017** O sistema DEVE manter por conexão e consumidor explícito o registro de valores completos entregues: ID, versão, campo e argumentos normalizados. Campo cortado ou ausente nunca conta como entregue.
+- **FR-018** Uma repetição elegível DEVE virar crumb somente se custar menos que o valor completo, não tiver expirado e `fresh` for falso; sem consumidor explícito o sistema não suprime valores.
+- **FR-019** Um crumb DEVE conter token de fragmento com identidade da entidade/campo/argumentos, versão e descritor de no máximo uma linha, conforme protocolo.
+- **FR-020** `morsel_expand` DEVE recuperar o campo de um token de fragmento ou a projeção explicitamente selecionada de uma entidade, com fresh e autorização atual. ID de entidade exige select; registrar somente entrega completa confirmada.
+- **FR-021** Crumbs DEVEM exigir identificador explícito de consumidor, isolado pelo namespace da conexão. Sem identificador, leituras e cache funcionam normalmente, mas não há supressão por histórico. Clientes DEVEM separar consumidores que não compartilham contexto.
 - **FR-022** O registro de entregas DEVE expirar conforme a configuração (por número de consultas e por tempo), para tolerar a compactação de contexto do agente.
 
 ### Leitura deduplicada
-- **FR-023** Leituras concorrentes da mesma entidade e versão DEVEM resultar em uma única leitura na fonte.
-- **FR-024** Entidades lidas DEVEM ser mantidas num cache normalizado em memória, com chave = ID + versão.
+- **FR-023** Materializações concorrentes da mesma entidade e versão DEVEM compartilhar uma leitura após autorização. Captura/revalidação para descobrir a versão não integra essa contagem; isso deve aparecer nas métricas.
+- **FR-024** Entidades lidas DEVEM ser mantidas num cache normalizado em memória, com chave que inclui raiz, política, ID e versão, limitado por capacidade; eviction permite releitura.
 
 ### Segurança
 - **FR-025** O sistema DEVE recusar caminhos fora da raiz configurada, inclusive via symlink.
@@ -131,14 +131,24 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 
 ### Ferramentas MCP
 - **FR-028** O servidor DEVE expor exatamente três ferramentas: `morsel_query`, `morsel_schema` e `morsel_expand` (ver `contracts/mcp-tools.md`).
-- **FR-029** Respostas DEVEM ser determinísticas: mesma entrada e mesmo estado produzem os mesmos bytes.
+- **FR-029** Respostas DEVEM ser determinísticas para entrada e estado completo iguais, incluindo entregas, medidor e expiração; não significa igualdade entre primeira e segunda consulta.
 
 ### Observabilidade e CLI
-- **FR-030** O sistema DEVE registrar, por sessão, os tokens servidos e os tokens do baseline ingênuo, conforme a definição em `plan.md` §7.
-- **FR-031** `morsel stats` DEVE exibir o resumo da sessão atual e das sessões recentes.
-- **FR-032** `morsel init` DEVE criar a configuração e o snippet de instruções sem sobrescrever conteúdo existente.
-- **FR-033** `morsel bench` DEVE executar tarefas A/B e gerar um relatório em Markdown e JSON.
+- **FR-030** O sistema DEVE registrar, por sessão, os tokens servidos e os tokens do baseline ingênuo, conforme a definição na spec M07.
+- **FR-031** `morsel stats` DEVE exibir resumo de sessão por ID ou da mais recente, com acesso a sessões recentes e sem presumir sessão MCP compartilhada com a CLI.
+- **FR-032** `morsel init` DEVE criar configuração sem sobrescrever, imprimir snippet e só gravar instruções com destino explícito, com bloco idempotente e preservação de conteúdo.
+- **FR-033** `bench/run` (runner externo opt-in) DEVE executar tarefas A/B e gerar um relatório em Markdown e JSON.
 - **FR-034** `morsel query '<bite>'` DEVE executar uma bite pela linha de comando, para depuração.
+
+### Invariantes de implementação
+- **FR-035** Toda execução DEVE ter limites independentes de entrada, profundidade, campos expandidos, trabalho, memória e tempo; deve aceitar cancelamento.
+- **FR-036** IDs DEVEM distinguir declarações em arquivos distintos; versões DEVEM derivar integralmente dos bytes capturados, sem depender apenas de timestamp e tamanho.
+- **FR-037** Paginação DEVE usar cursor validado, vinculado à seleção, snapshot e política; cursor incompatível não pode continuar silenciosamente.
+- **FR-038** O histórico de entregas DEVE ser efetivado somente depois de escrita bem-sucedida do resultado final; falhas não podem suprimir futuras leituras.
+- **FR-039** As definições das ferramentas e exemplos DEVEM ter fonte canônica verificável e compatibilidade explícita com o perfil de projeção.
+- **FR-040** O projeto DEVE fornecer licença, contribuição, política de segurança, checks reproduzíveis e critérios explícitos de release.
+- **FR-041** Cache, entregas, cursores e métricas DEVEM ter limites e retenção definidos; métricas persistidas não podem conter fontes, caminhos, queries ou segredos.
+- **FR-042** O benchmark DEVE fixar entradas, versões e verificadores independentes; falhas, uso ausente e incerteza devem constar do resultado sem fabricar economia.
 
 ---
 
@@ -148,27 +158,30 @@ Permitir que um agente de IA consulte **arquivos e símbolos de código Go** de 
 - **Bite:** consulta com seleção de campos e orçamento opcional.
 - **Plate:** orçamento de tokens efetivo de uma bite.
 - **Crumb:** referência a uma entrega anterior (`id@version` + descritor).
-- **Consumer:** quem recebe as respostas (sessão MCP ou ID explícito). Os crumbs são por consumidor.
+- **Consumer:** contexto explicitamente identificado pelo cliente e isolado por conexão. Sem identificador não há supressão por crumbs.
 - **Ledger:** registro, por sessão, de tokens servidos e do baseline.
 
 ## Casos de borda
 
-- Arquivo gigante (> 1 MB): o `content` é sempre cortado pelo orçamento, e `outline` e `lines` continuam funcionando.
-- Arquivo gerado (`// Code generated ... DO NOT EDIT.`): é marcado com `generated: true`, e o `body` dos símbolos é cortado por padrão.
-- Arquivo com erro de sintaxe Go: o índice daquele arquivo usa a última versão válida e marca `stale: true`, ou fica vazio se nunca foi válido.
-- Arquivo apagado entre consultas: o crumb correspondente vira inválido e `ref` devolve `not_found`.
-- Consulta vazia ou só com `__typename`: resposta válida com o custo do envelope.
-- Encoding diferente de UTF-8: o arquivo é tratado como binário, a menos que seja configurado.
+- Arquivo >1 MiB e dentro de `max_file_bytes`: projeção e leitura em linhas continuam disponíveis; resposta obedece ao orçamento. Acima do limite retorna `limit` sem ler todo o arquivo.
+- Gerado: `generated: true`; não se remove corpo por ser gerado. Somente seleção explícita, `@brief`, limites e orçamento reduzem conteúdo.
+- Erro de sintaxe Go: arquivo ainda pode ser lido como texto, mas seus símbolos não são servidos a partir de índice anterior. Retorna `index_unavailable` na resolução afetada.
+- Arquivo removido: `not_found`; crumb não concede acesso. Mudança durante snapshot: `source_changed` recuperável.
+- `{}` é inválido na gramática. `{ __typename }` é válido. Documento vazio é `invalid_query`.
+- Não UTF-8, arquivo binário ou especial: não servir conteúdo. Binários regulares podem expor metadados autorizados; arquivos especiais são negados.
+- Mesmo tamanho e timestamp com bytes diferentes: versão nova na próxima captura. Renomear invalida ID/cursor anterior.
+- Mesmo nome sob build tags: entidades distintas por arquivo. Análise sintática abrange todos os `.go` permitidos; não promete respeitar o build ativo.
 
 ## Critérios de sucesso
 
-- **SC-001** Consultas de arquivo ou símbolo com o cache aquecido respondem em **p95 < 50 ms** num repositório de 5 mil arquivos.
-- **SC-002** O erro da estimativa de tokens fica dentro de **±15% (p90)** no corpus de calibração, comparado ao tokenizer de referência.
-- **SC-003** Instalação até a primeira bite útil em **menos de 5 minutos**, seguindo o README.
-- **SC-004** O binário é estático, sem cgo, com **menos de 25 MB**.
-- **SC-005** (Hipótese H1, a validar) No benchmark A/B, há **≥ 30% menos tokens de entrada**, sem queda de taxa de sucesso maior que o intervalo de variação. Se o resultado for menor que 20% ou a queda de sucesso for maior que 5 p.p., aciona-se o critério de parada da VISION.
+- **SC-001** Meta, ainda não validada: p95 <50 ms em corpus de 5 mil arquivos, máquina, tamanho e tipos de query fixados. Medir captura/revalidação no total, separar caminhos frio/aquecido e não excluir trabalho para atingir a meta.
+- **SC-002** Meta: erro da heurística em ±15% (p90) em corpus público fixado, contra tokenizer de referência identificado com versão. Até existir corpus/calibração, não anunciar essa precisão.
+- **SC-003** Instalação até primeira bite em <5 minutos, observada em máquina limpa com release real.
+- **SC-004** Binário sem cgo, <25 MB por alvo publicado; estático onde aplicável, sem prometer formato ELF estático em todos os sistemas.
+- **SC-005** H1: ≥30% menos tokens de entrada, com sucesso não inferior dentro de margem predefinida. Abaixo de 20% ou perda >5 p.p. exige rever tese. Intervalo inconclusivo não autoriza anunciar H1 como comprovada.
 
-## Pontos em aberto
+## Divisão e decisões
 
-- **[NEEDS CLARIFICATION]** Subagentes do Claude Code compartilham a mesma sessão MCP do agente principal? Isso define se o FR-021 precisa de um ID de consumidor explícito para funcionar com subagentes. **Ação:** experimento na T005 antes da US3.
-- ~~Qual tokenizer de referência usar para o SC-002?~~ **Resolvido em `research.md` R5:** a API de contagem do provedor, usada só na calibração offline.
+As sete specs do [catálogo](README.md) detalham requisitos, aceitação, plano e tarefas. Contratos em [protocol.md](contracts/protocol.md) resolvem precedência de orçamento, identidade, cursores e perfil GraphQL.
+
+Não há `[NEEDS CLARIFICATION]` bloqueando implementação: consumidor explícito é decisão conservadora e independente do cliente. Compatibilidade real com cada agente é um gate experimental da M06, não suposição de arquitetura.

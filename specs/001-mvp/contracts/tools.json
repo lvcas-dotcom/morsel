@@ -1,0 +1,127 @@
+[
+  {
+    "name": "morsel_query",
+    "description": "Query local files and Go symbols with a GraphQL selection. Request only needed fields. Cost is measured by the declared local meter, not provider billing. Set consumer only for a shared context; repeated complete text may become {$crumb,v,d}. Use fresh or morsel_expand to recover text.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "variables": {
+          "type": "object",
+          "default": {}
+        },
+        "operationName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000,
+          "description": "Local meter budget; overrides query directive."
+        },
+        "fresh": {
+          "type": "boolean",
+          "default": false
+        },
+        "consumer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Explicit context owner; omit to disable crumbs."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "morsel_schema",
+    "description": "Discover query roots, types and fields. Optional search narrows the overview and shows paths from the root. Output is a compact textual guide, not a full GraphQL introspection result.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "search": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "morsel_expand",
+    "description": "Recover current content from a $crumb token, or select fields of an entity ID. Entity IDs require select; fragment tokens recover their original field by default. Always bypasses crumb suppression, subject to access policy and local budget.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "select": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000,
+          "description": "Local meter budget; overrides query directive."
+        },
+        "consumer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Explicit context owner; omit to disable crumbs."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "pattern": "^frag:"
+              }
+            }
+          },
+          "then": {},
+          "else": {
+            "required": [
+              "select"
+            ]
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  }
+]
